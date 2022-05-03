@@ -1,0 +1,68 @@
+name: Generate screenshots
+
+on:
+  push:
+    branches:
+      - 'screenshots/*'
+    
+jobs:
+  screenshots:
+    name: Generate screenshots
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        api-level: [29]
+        target: [default]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Java jdk
+        uses: actions/setup-java@v3.0.0
+        with:
+          distribution: 'zulu'
+          java-version: 12.x
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0.2
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          cache-key: flutter2.10 # change this to force refresh cache
+
+      - name: Get dependencies
+        run: ci/pub_upgrade.sh
+
+      - name: Run Flutter screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          script: yes | flutter doctor --android-licenses \
+            && flutter drive -d emulator-5554 --driver=test_driver/main_app.dart --target=test/basic_example_test.dart \
+
+      - name: Run screenshot generation
+        run: cd ./packages/smooth_app/ && flutter drive 
+          --driver=test_driver/screenshot_driver.dart 
+          --target=integration_test/app_test.dart 
+          --dart-define=LANGUAGE=${{ matrix.language }} 
+          --dart-define=COUNTRY=${{ matrix.country }} 
+          --dart-define=PLATFORM=${{ matrix.platform }}
+           --dart-define=DEVICE=${{ matrix.device }}
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v2
+        with:
+          name: screenshots
+          path: fastlane/screenshots/ # or path/to/artifact
+
+
+
+
+
